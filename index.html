@@ -55,8 +55,6 @@ h1{margin:0;font-size:22px;font-weight:700;letter-spacing:.02em}
 .status i{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block}
 .status.ok i{background:#2FA36B}.status.busy i{background:var(--m1)}.status.err i{background:var(--now)}
 
-.layout{display:grid;grid-template-columns:1fr 220px;gap:20px;align-items:start}
-@media (max-width:900px){.layout{grid-template-columns:1fr}}
 
 .boardScroll{overflow-x:auto;border-radius:14px;border:1px solid var(--line);background:var(--surface)}
 .board{display:grid;grid-template-columns:92px repeat(3,minmax(180px,1fr));min-width:640px}
@@ -79,31 +77,17 @@ h1{margin:0;font-size:22px;font-weight:700;letter-spacing:.02em}
 
 .cell{border-bottom:1px solid var(--line);border-left:1px solid var(--line);padding:8px;position:relative;min-height:118px;display:flex;flex-direction:column}
 .cell.nowRow{background:color-mix(in srgb,var(--now) 4%,transparent)}
-.cell textarea{flex:1;width:100%;resize:none;border:1px solid transparent;border-radius:8px;background:var(--soft);padding:8px 10px 26px;line-height:1.55;min-height:100px;font-size:14px;transition:border-color .15s}
+.cell textarea{flex:1;width:100%;resize:none;border:1px solid transparent;border-radius:8px;background:var(--soft);padding:8px 10px;line-height:1.55;min-height:100px;font-size:14px;transition:border-color .15s}
 .cell textarea:hover{border-color:var(--line)}
 .cell textarea:focus{outline:none;border-color:var(--mc);background:var(--surface);box-shadow:0 0 0 3px color-mix(in srgb,var(--mc) 18%,transparent)}
 .cell textarea::placeholder{color:color-mix(in srgb,var(--muted) 70%,transparent)}
-.cell.done textarea{text-decoration:line-through;color:var(--muted)}
 .cell .bar{position:absolute;left:8px;top:8px;bottom:8px;width:3px;border-radius:3px;background:var(--mc);opacity:0;transition:opacity .15s}
 .cell.filled .bar{opacity:1}
-.cell .doneBtn{position:absolute;right:14px;bottom:14px;border:1px solid var(--line);background:var(--surface);border-radius:999px;font-size:11px;padding:1px 9px;cursor:pointer;color:var(--muted)}
-.cell.done .doneBtn{background:var(--mc);border-color:var(--mc);color:#fff}
-.cell:not(.filled) .doneBtn{display:none}
 
 .lunch{grid-column:1 / -1;display:flex;align-items:center;gap:14px;padding:8px 14px;border-bottom:1px solid var(--line);
   background:repeating-linear-gradient(135deg,var(--lunch) 0 10px,color-mix(in srgb,var(--lunch) 70%,var(--surface)) 10px 20px)}
 .lunch .st{font-family:var(--num);font-weight:600;font-feature-settings:"tnum"}
 .lunch span{color:var(--muted);font-size:13px}
-
-aside.hist{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px}
-aside.hist h2{font-size:14px;margin:0 0 8px}
-aside.hist p{margin:0;color:var(--muted);font-size:13px}
-.histList{list-style:none;margin:0;padding:0;max-height:560px;overflow-y:auto}
-.histList button{width:100%;text-align:left;border:0;background:transparent;padding:7px 8px;border-radius:8px;cursor:pointer;display:flex;justify-content:space-between;font-feature-settings:"tnum"}
-.histList button:hover{background:var(--soft)}
-.histList button.cur{background:color-mix(in srgb,var(--focus) 12%,transparent);font-weight:700}
-.histList .y{color:var(--muted);font-size:12px}
-@media (max-width:900px){.histList{max-height:220px}}
 
 .note{margin:10px 2px 0;font-size:13px;color:var(--muted)}
 .banner{display:none;margin-bottom:12px;padding:10px 14px;border-radius:10px;background:color-mix(in srgb,var(--now) 10%,var(--surface));border:1px solid color-mix(in srgb,var(--now) 30%,var(--line));font-size:13px}
@@ -132,16 +116,9 @@ aside.hist p{margin:0;color:var(--muted);font-size:13px}
 
   <div class="banner" id="banner"></div>
 
-  <div class="layout">
-    <div>
+  <div>
       <div class="boardScroll"><div class="board" id="board"></div></div>
       <p class="note">入力すると自動でスプレッドシートに保存されます。他の人の入力は約15秒ごとに自動で反映されます。メンバー名は全日共通です。</p>
-    </div>
-    <aside class="hist">
-      <h2>記録のある日</h2>
-      <ul class="histList" id="histList"></ul>
-      <p id="histEmpty">まだ記録はありません。予定を入力するとここに日付が追加されます。</p>
-    </aside>
   </div>
 </div>
 
@@ -173,7 +150,6 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbyg3HoapYRTdJXbuYK1upRu
   let curDate=todayStr();
   let names=["","",""];
   let cells={};              // "m_k" -> {t,d,n}
-  let histDates=[];
   let namesDirty=false;
   const dirty=new Set();     // 入力中でまだ送信待ちのマス
   const timers={};
@@ -209,7 +185,7 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbyg3HoapYRTdJXbuYK1upRu
       b.appendChild(t);
       for(let m=0;m<3;m++){
         const c=document.createElement("div");c.className="cell";c.dataset.m=m;c.dataset.k=s.k;c.style.setProperty("--mc",`var(${MC[m]})`);
-        c.innerHTML=`<span class="bar"></span><textarea data-m="${m}" data-k="${s.k}" placeholder="予定を入力" aria-label="${s.s}〜${s.e} メンバー${m+1}の予定"></textarea><button class="doneBtn" data-m="${m}" data-k="${s.k}" type="button">完了</button>`;
+        c.innerHTML=`<span class="bar"></span><textarea data-m="${m}" data-k="${s.k}" placeholder="予定を入力" aria-label="${s.s}〜${s.e} メンバー${m+1}の予定"></textarea>`;
         b.appendChild(c);
       }
     }
@@ -221,8 +197,6 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbyg3HoapYRTdJXbuYK1upRu
       const key=c.dataset.m+"_"+c.dataset.k,v=cells[key]||{},ta=c.querySelector("textarea");
       if(document.activeElement!==ta&&!busyKey(key))ta.value=v.t||"";
       c.classList.toggle("filled",!!ta.value.trim());
-      c.classList.toggle("done",!!v.d&&!!ta.value.trim());
-      c.querySelector(".doneBtn").textContent=v.d?"完了 ✓":"完了";
     });
     for(let m=0;m<3;m++){
       let dn="";for(const s of SLOTS){if(s.lunch)continue;const v=cells[m+"_"+s.k];if(v&&v.n){dn=v.n;break}}
@@ -238,7 +212,7 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbyg3HoapYRTdJXbuYK1upRu
     const d=parse(curDate),t=todayStr(),diff=Math.round((d-parse(t))/86400000);
     const rel=diff===0?"今日":diff===-1?"昨日":diff===1?"明日":diff<0?`${-diff}日前`:`${diff}日後`;
     $("dateLabel").innerHTML=`${d.getMonth()+1}月${d.getDate()}日（${WD[d.getDay()]}）<small>${d.getFullYear()}年・${rel}</small>`;
-    $("picker").value=curDate;paintNow();paintHist();
+    $("picker").value=curDate;paintNow();
   }
   function paintNow(){
     const now=new Date(),isToday=curDate===todayStr(),h=now.getHours()+now.getMinutes()/60;
@@ -250,17 +224,6 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbyg3HoapYRTdJXbuYK1upRu
       if(!on&&tag)tag.remove();
       document.querySelectorAll(`.cell[data-k="${s.k}"]`).forEach(c=>c.classList.toggle("nowRow",on));
     });
-  }
-  function paintHist(){
-    const ul=$("histList");ul.innerHTML="";
-    $("histEmpty").style.display=histDates.length?"none":"block";
-    for(const s of histDates){
-      const d=parse(s),li=document.createElement("li"),b=document.createElement("button");
-      b.type="button";if(s===curDate)b.className="cur";
-      const a=document.createElement("span");a.textContent=`${d.getMonth()+1}/${d.getDate()}（${WD[d.getDay()]}）`;
-      const y=document.createElement("span");y.className="y";y.textContent=s===todayStr()?"今日":String(d.getFullYear());
-      b.append(a,y);b.onclick=()=>go(s);li.appendChild(b);ul.appendChild(li);
-    }
   }
 
   /* ---------- 通信 ---------- */
@@ -278,9 +241,8 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbyg3HoapYRTdJXbuYK1upRu
         if(busyKey(key))continue;
         if(next[key])cells[key]=next[key];else delete cells[key];
       }
-      histDates=Array.isArray(j.dates)?j.dates:[];
       if(lastError.startsWith("読み込み"))lastError="";
-      paintNames();paintHist();refreshStatus();
+      paintNames();refreshStatus();
     }catch(e){
       if(seq!==fetchSeq)return;
       lastError="読み込みできませんでした。通信状況とURLを確認してください";refreshStatus();
@@ -298,7 +260,6 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbyg3HoapYRTdJXbuYK1upRu
       const j=await r.json();
       if(!j.ok)throw new Error(j.error||"error");
       lastError="";
-      if(payload.action==="saveCell"&&payload.t.trim()&&!histDates.includes(payload.date)){histDates=[...histDates,payload.date].sort().reverse();paintHist()}
     }catch(e){
       if(!queue.has(qkey))queue.set(qkey,payload);   // 失敗した内容は再送する
       lastError="保存できませんでした。5秒後に再試行します";
@@ -316,7 +277,7 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbyg3HoapYRTdJXbuYK1upRu
     if(!dirty.has(key))return;dirty.delete(key);
     if(date!==curDate)return;
     const v=cells[key]||{t:"",d:false};
-    enqueue(date+"|"+key,{action:"saveCell",date,m,k,t:v.t||"",d:!!v.d,name:names[m]||""});
+    enqueue(date+"|"+key,{action:"saveCell",date,m,k,t:v.t||"",d:false,name:names[m]||""});
   }
   function commitAll(){
     for(const key of [...dirty]){const[m,k]=key.split("_");commitCell(+m,k,curDate)}
@@ -332,7 +293,7 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbyg3HoapYRTdJXbuYK1upRu
     const t=e.target;
     if(t.matches("textarea[data-m]")){
       const m=+t.dataset.m,k=t.dataset.k,key=m+"_"+k,cur=cells[key]||{};
-      cells[key]={...cur,t:t.value,d:t.value.trim()?!!cur.d:false};
+      cells[key]={...cur,t:t.value,d:false};
       t.closest(".cell").classList.toggle("filled",!!t.value.trim());
       scheduleCell(m,k);
     }else if(t.matches("[data-name]")){names[+t.dataset.name]=t.value;scheduleNames()}
@@ -340,11 +301,6 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbyg3HoapYRTdJXbuYK1upRu
   document.addEventListener("focusout",e=>{
     const t=e.target;
     if(t.matches("textarea[data-m]"))commitCell(+t.dataset.m,t.dataset.k,curDate);
-  });
-  document.addEventListener("click",e=>{
-    const b=e.target.closest(".doneBtn");if(!b)return;
-    const m=+b.dataset.m,k=b.dataset.k,key=m+"_"+k,cur=cells[key]||{};
-    cells[key]={...cur,d:!cur.d};dirty.add(key);paintCells();commitCell(m,k,curDate);
   });
 
   function go(s){
