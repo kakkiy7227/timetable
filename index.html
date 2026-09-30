@@ -66,6 +66,9 @@ h1{margin:0;font-size:22px;font-weight:700;letter-spacing:.02em}
 .head input{width:100%;border:0;border-bottom:2px solid transparent;background:transparent;font-weight:700;font-size:16px;padding:4px 0}
 .head input:focus{outline:none;border-bottom-color:currentColor}
 .head input::placeholder{color:var(--muted);font-weight:500}
+.head .clock{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12px;color:var(--muted)}
+.head select{height:30px;border:1px solid var(--line);border-radius:8px;background:var(--soft);padding:0 6px;font-family:var(--num);font-size:14px;color:var(--muted);cursor:pointer;font-feature-settings:"tnum"}
+.head select.set{color:var(--ink);border-color:currentColor;background:var(--surface)}
 .head .was{font-size:12px;color:var(--muted);margin-top:2px;min-height:1.2em}
 .head .count{font-size:12px;color:var(--muted)}
 
@@ -166,12 +169,13 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbyg3HoapYRTdJXbuYK1upRu
   }
   function banner(t){const b=$("banner");b.textContent=t;b.classList.toggle("show",!!t)}
 
+  const IN_OPTS=(()=>{let o='<option value="">--:--</option>';for(let t=6*60;t<=10*60;t+=15){const v=Math.floor(t/60)+":"+pad(t%60);o+=`<option value="${v}">${v}</option>`}return o})();
   function build(){
     const b=$("board");b.innerHTML="";
     const corner=document.createElement("div");corner.className="head corner";corner.textContent="時間";b.appendChild(corner);
     for(let m=0;m<3;m++){
       const h=document.createElement("div");h.className="head";h.style.color=`var(${MC[m]})`;
-      h.innerHTML=`<div class="who"><span class="dot" style="background:var(${MC[m]})"></span><input data-name="${m}" maxlength="20" placeholder="メンバー${m+1}の名前" aria-label="メンバー${m+1}の名前"></div><div class="was" data-was="${m}"></div>`;
+      h.innerHTML=`<div class="who"><span class="dot" style="background:var(${MC[m]})"></span><input data-name="${m}" maxlength="20" placeholder="メンバー${m+1}の名前" aria-label="メンバー${m+1}の名前"></div><label class="clock">出勤<select data-in="${m}" aria-label="メンバー${m+1}の出勤時刻">${IN_OPTS}</select></label><div class="was" data-was="${m}"></div>`;
       b.appendChild(h);
     }
     for(const s of SLOTS){
@@ -197,6 +201,11 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbyg3HoapYRTdJXbuYK1upRu
       const key=c.dataset.m+"_"+c.dataset.k,v=cells[key]||{},ta=c.querySelector("textarea");
       if(document.activeElement!==ta&&!busyKey(key))ta.value=v.t||"";
       c.classList.toggle("filled",!!ta.value.trim());
+    });
+    document.querySelectorAll("[data-in]").forEach(sel=>{
+      const key=sel.dataset.in+"_in";
+      if(document.activeElement!==sel&&!busyKey(key))sel.value=(cells[key]&&cells[key].t)||"";
+      sel.classList.toggle("set",!!sel.value);
     });
     for(let m=0;m<3;m++){
       let dn="";for(const s of SLOTS){if(s.lunch)continue;const v=cells[m+"_"+s.k];if(v&&v.n){dn=v.n;break}}
@@ -297,6 +306,13 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbyg3HoapYRTdJXbuYK1upRu
       t.closest(".cell").classList.toggle("filled",!!t.value.trim());
       scheduleCell(m,k);
     }else if(t.matches("[data-name]")){names[+t.dataset.name]=t.value;scheduleNames()}
+  });
+  document.addEventListener("change",e=>{
+    const t=e.target;if(!t.matches("[data-in]"))return;
+    const m=+t.dataset.in,key=m+"_in";
+    cells[key]={t:t.value,d:false};dirty.add(key);
+    t.classList.toggle("set",!!t.value);
+    commitCell(m,"in",curDate);
   });
   document.addEventListener("focusout",e=>{
     const t=e.target;
