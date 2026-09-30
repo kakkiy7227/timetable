@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>業務タイムテーブル</title>
+<title>QMS監査G 業務タイムテーブル</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Sora:wght@400;600&display=swap" rel="stylesheet">
@@ -116,8 +116,8 @@ aside.hist p{margin:0;color:var(--muted);font-size:13px}
 <div class="wrap">
   <header class="top">
     <div>
-      <h1>業務タイムテーブル</h1>
-      <p class="sub">6:00〜21:00・2時間ごと（12:00〜13:00は昼休憩）</p>
+      <h1>QMS監査G 業務タイムテーブル</h1>
+      <p class="sub">6:00〜21:00（12:00〜12:40は昼休憩）</p>
     </div>
     <div class="datebar">
       <button id="prev" aria-label="前の日">◀</button>
@@ -155,8 +155,8 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbyg3HoapYRTdJXbuYK1upRu
     {k:"06",s:"6:00",e:"8:00",sky:"--sky0",from:6,to:8},
     {k:"08",s:"8:00",e:"10:00",sky:"--sky1",from:8,to:10},
     {k:"10",s:"10:00",e:"12:00",sky:"--sky2",from:10,to:12},
-    {lunch:true,from:12,to:13},
-    {k:"13",s:"13:00",e:"15:00",sky:"--sky3",from:13,to:15},
+    {lunch:true,from:12,to:12+40/60},
+    {k:"13",s:"12:40",e:"15:00",sky:"--sky3",from:12+40/60,to:15},
     {k:"15",s:"15:00",e:"17:00",sky:"--sky4",from:15,to:17},
     {k:"17",s:"17:00",e:"19:00",sky:"--sky5",from:17,to:19},
     {k:"19",s:"19:00",e:"21:00",sky:"--sky6",from:19,to:21},
@@ -201,7 +201,7 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbyg3HoapYRTdJXbuYK1upRu
     for(const s of SLOTS){
       if(s.lunch){
         const l=document.createElement("div");l.className="lunch";
-        l.innerHTML=`<span class="st">12:00 – 13:00</span><span>昼休憩</span>`;
+        l.innerHTML=`<span class="st">12:00 – 12:40</span><span>昼休憩</span>`;
         b.appendChild(l);continue;
       }
       const t=document.createElement("div");t.className="time";t.dataset.slot=s.k;t.style.background=`var(${s.sky})`;
