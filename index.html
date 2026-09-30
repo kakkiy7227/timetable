@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>業務タイムテーブル</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Sora:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#EDF1F4; --surface:#FFFFFF; --ink:#1B2733; --muted:#5E6B78; --line:#D5DDE3; --soft:#F5F8FA;
+  --m0:#0E8588; --m1:#C47F00; --m2:#6A4FB6;
+  --sky0:#DDEEF6; --sky1:#D3EAEF; --sky2:#D0E7E2; --lunch:#F4ECD3; --sky3:#E4E3F0; --sky4:#DAD6EE; --sky5:#CDC8E7; --sky6:#BFB9E0;
+  --now:#E0463A; --focus:#2F6FDE;
+  --sans:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic","Meiryo",system-ui,sans-serif;
+  --num:"Sora","Zen Kaku Gothic New",system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#11171D; --surface:#19222A; --ink:#E6ECF1; --muted:#96A3AF; --line:#2B3843; --soft:#1E2831;
+    --m0:#3CC2C4; --m1:#F0AE3C; --m2:#A68CF0;
+    --sky0:#1C3340; --sky1:#1B3438; --sky2:#1C3431; --lunch:#3A3321; --sky3:#26253A; --sky4:#262240; --sky5:#241F45; --sky6:#211B4A;
+    --now:#FF6B5E; --focus:#6C9CFF;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#11171D; --surface:#19222A; --ink:#E6ECF1; --muted:#96A3AF; --line:#2B3843; --soft:#1E2831;
+  --m0:#3CC2C4; --m1:#F0AE3C; --m2:#A68CF0;
+  --sky0:#1C3340; --sky1:#1B3438; --sky2:#1C3431; --lunch:#3A3321; --sky3:#26253A; --sky4:#262240; --sky5:#241F45; --sky6:#211B4A;
+  --now:#FF6B5E; --focus:#6C9CFF;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+button,input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+.wrap{max-width:1180px;margin:0 auto;padding:20px 16px 40px}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px 24px;margin-bottom:18px}
+h1{margin:0;font-size:22px;font-weight:700;letter-spacing:.02em}
+.sub{margin:2px 0 0;color:var(--muted);font-size:13px}
+
+.datebar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.datebar button{border:1px solid var(--line);background:var(--surface);border-radius:8px;height:38px;min-width:38px;padding:0 12px;cursor:pointer}
+.datebar button:hover{background:var(--soft)}
+.dateLabel{font-size:20px;font-weight:700;min-width:9.5em;text-align:center;font-feature-settings:"tnum"}
+.dateLabel small{display:block;font-size:12px;font-weight:500;color:var(--muted);line-height:1.2}
+.datebar input[type=date]{height:38px;border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:0 8px}
+
+.status{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.status i{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block}
+.status.ok i{background:#2FA36B}.status.busy i{background:var(--m1)}.status.err i{background:var(--now)}
+
+.layout{display:grid;grid-template-columns:1fr 220px;gap:20px;align-items:start}
+@media (max-width:900px){.layout{grid-template-columns:1fr}}
+
+.boardScroll{overflow-x:auto;border-radius:14px;border:1px solid var(--line);background:var(--surface)}
+.board{display:grid;grid-template-columns:92px repeat(3,minmax(180px,1fr));min-width:640px}
+
+.head{position:sticky;top:0;z-index:2;background:var(--surface);border-bottom:1px solid var(--line);padding:12px 12px 10px}
+.head.corner{display:flex;align-items:flex-end;color:var(--muted);font-size:12px}
+.head .who{display:flex;align-items:center;gap:8px}
+.head .dot{width:12px;height:12px;border-radius:4px;flex:none}
+.head input{width:100%;border:0;border-bottom:2px solid transparent;background:transparent;font-weight:700;font-size:16px;padding:4px 0}
+.head input:focus{outline:none;border-bottom-color:currentColor}
+.head input::placeholder{color:var(--muted);font-weight:500}
+.head .was{font-size:12px;color:var(--muted);margin-top:2px;min-height:1.2em}
+.head .count{font-size:12px;color:var(--muted)}
+
+.time{padding:10px 10px 10px 14px;border-bottom:1px solid var(--line);position:relative;display:flex;flex-direction:column;justify-content:flex-start}
+.time .st{font-family:var(--num);font-size:22px;font-weight:600;line-height:1.1;font-feature-settings:"tnum"}
+.time .en{font-family:var(--num);font-size:12px;color:var(--muted);font-feature-settings:"tnum"}
+.time.now::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--now)}
+.time .nowTag{margin-top:auto;font-size:11px;font-weight:700;color:var(--now)}
+
+.cell{border-bottom:1px solid var(--line);border-left:1px solid var(--line);padding:8px;position:relative;min-height:118px;display:flex;flex-direction:column}
+.cell.nowRow{background:color-mix(in srgb,var(--now) 4%,transparent)}
+.cell textarea{flex:1;width:100%;resize:none;border:1px solid transparent;border-radius:8px;background:var(--soft);padding:8px 10px 26px;line-height:1.55;min-height:100px;font-size:14px;transition:border-color .15s}
+.cell textarea:hover{border-color:var(--line)}
+.cell textarea:focus{outline:none;border-color:var(--mc);background:var(--surface);box-shadow:0 0 0 3px color-mix(in srgb,var(--mc) 18%,transparent)}
+.cell textarea::placeholder{color:color-mix(in srgb,var(--muted) 70%,transparent)}
+.cell.done textarea{text-decoration:line-through;color:var(--muted)}
+.cell .bar{position:absolute;left:8px;top:8px;bottom:8px;width:3px;border-radius:3px;background:var(--mc);opacity:0;transition:opacity .15s}
+.cell.filled .bar{opacity:1}
+.cell .doneBtn{position:absolute;right:14px;bottom:14px;border:1px solid var(--line);background:var(--surface);border-radius:999px;font-size:11px;padding:1px 9px;cursor:pointer;color:var(--muted)}
+.cell.done .doneBtn{background:var(--mc);border-color:var(--mc);color:#fff}
+.cell:not(.filled) .doneBtn{display:none}
+
+.lunch{grid-column:1 / -1;display:flex;align-items:center;gap:14px;padding:8px 14px;border-bottom:1px solid var(--line);
+  background:repeating-linear-gradient(135deg,var(--lunch) 0 10px,color-mix(in srgb,var(--lunch) 70%,var(--surface)) 10px 20px)}
+.lunch .st{font-family:var(--num);font-weight:600;font-feature-settings:"tnum"}
+.lunch span{color:var(--muted);font-size:13px}
+
+aside.hist{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px}
+aside.hist h2{font-size:14px;margin:0 0 8px}
+aside.hist p{margin:0;color:var(--muted);font-size:13px}
+.histList{list-style:none;margin:0;padding:0;max-height:560px;overflow-y:auto}
+.histList button{width:100%;text-align:left;border:0;background:transparent;padding:7px 8px;border-radius:8px;cursor:pointer;display:flex;justify-content:space-between;font-feature-settings:"tnum"}
+.histList button:hover{background:var(--soft)}
+.histList button.cur{background:color-mix(in srgb,var(--focus) 12%,transparent);font-weight:700}
+.histList .y{color:var(--muted);font-size:12px}
+@media (max-width:900px){.histList{max-height:220px}}
+
+.note{margin:10px 2px 0;font-size:13px;color:var(--muted)}
+.banner{display:none;margin-bottom:12px;padding:10px 14px;border-radius:10px;background:color-mix(in srgb,var(--now) 10%,var(--surface));border:1px solid color-mix(in srgb,var(--now) 30%,var(--line));font-size:13px}
+.banner.show{display:block}
+.ro textarea,.ro .head input{pointer-events:none}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>業務タイムテーブル</h1>
+      <p class="sub">6:00〜21:00・2時間ごと（12:00〜13:00は昼休憩）</p>
+    </div>
+    <div class="datebar">
+      <button id="prev" aria-label="前の日">◀</button>
+      <div class="dateLabel" id="dateLabel"></div>
+      <button id="next" aria-label="次の日">▶</button>
+      <button id="today">今日</button>
+      <button id="reload" aria-label="最新の状態に更新" title="最新の状態に更新">⟳</button>
+      <input type="date" id="picker" aria-label="日付を選ぶ">
+    </div>
+    <div class="status" id="status" role="status"><i></i><span>読み込み中…</span></div>
+  </header>
+
+  <div class="banner" id="banner"></div>
+
+  <div class="layout">
+    <div>
+      <div class="boardScroll"><div class="board" id="board"></div></div>
+      <p class="note">入力すると自動でスプレッドシートに保存されます。他の人の入力は約15秒ごとに自動で反映されます。メンバー名は全日共通です。</p>
+    </div>
+    <aside class="hist">
+      <h2>記録のある日</h2>
+      <ul class="histList" id="histList"></ul>
+      <p id="histEmpty">まだ記録はありません。予定を入力するとここに日付が追加されます。</p>
+    </aside>
+  </div>
+</div>
+
+<script>
+// ▼ Apps Scriptをデプロイしたときに表示される「ウェブアプリのURL」を貼り付けてください
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbyg3HoapYRTdJXbuYK1upRuNZV8qoK1r4578tMiVZhMRW7GviZ6fcEx4UlhcepgawIcsA/exec';
+
+(function(){
+  const POLL_MS=15000;
+  const SLOTS=[
+    {k:"06",s:"6:00",e:"8:00",sky:"--sky0",from:6,to:8},
+    {k:"08",s:"8:00",e:"10:00",sky:"--sky1",from:8,to:10},
+    {k:"10",s:"10:00",e:"12:00",sky:"--sky2",from:10,to:12},
+    {lunch:true,from:12,to:13},
+    {k:"13",s:"13:00",e:"15:00",sky:"--sky3",from:13,to:15},
+    {k:"15",s:"15:00",e:"17:00",sky:"--sky4",from:15,to:17},
+    {k:"17",s:"17:00",e:"19:00",sky:"--sky5",from:17,to:19},
+    {k:"19",s:"19:00",e:"21:00",sky:"--sky6",from:19,to:21},
+  ];
+  const WD=["日","月","火","水","木","金","土"];
+  const MC=["--m0","--m1","--m2"];
+  const $=id=>document.getElementById(id);
+  const pad=n=>String(n).padStart(2,"0");
+  const ymd=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+  const parse=s=>{const[y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)};
+  const todayStr=()=>ymd(new Date());
+  const configured=/^https:\/\/script\.google\.com\//.test(GAS_URL);
+
+  let curDate=todayStr();
+  let names=["","",""];
+  let cells={};              // "m_k" -> {t,d,n}
+  let histDates=[];
+  let namesDirty=false;
+  const dirty=new Set();     // 入力中でまだ送信待ちのマス
+  const timers={};
+  const queue=new Map();     // 送信待ち（キー→最新の内容）
+  let sending=false, lastError="", fetchSeq=0;
+
+  /* ---------- 表示 ---------- */
+  function setStatus(kind,text){const el=$("status");el.className="status "+kind;el.querySelector("span").textContent=text}
+  function refreshStatus(){
+    if(!configured)return;
+    if(lastError)setStatus("err",lastError);
+    else if(sending||queue.size||dirty.size||namesDirty)setStatus("busy","保存中…");
+    else setStatus("ok","保存済み");
+  }
+  function banner(t){const b=$("banner");b.textContent=t;b.classList.toggle("show",!!t)}
+
+  function build(){
+    const b=$("board");b.innerHTML="";
+    const corner=document.createElement("div");corner.className="head corner";corner.textContent="時間";b.appendChild(corner);
+    for(let m=0;m<3;m++){
+      const h=document.createElement("div");h.className="head";h.style.color=`var(${MC[m]})`;
+      h.innerHTML=`<div class="who"><span class="dot" style="background:var(${MC[m]})"></span><input data-name="${m}" maxlength="20" placeholder="メンバー${m+1}の名前" aria-label="メンバー${m+1}の名前"></div><div class="was" data-was="${m}"></div>`;
+      b.appendChild(h);
+    }
+    for(const s of SLOTS){
+      if(s.lunch){
+        const l=document.createElement("div");l.className="lunch";
+        l.innerHTML=`<span class="st">12:00 – 13:00</span><span>昼休憩</span>`;
+        b.appendChild(l);continue;
+      }
+      const t=document.createElement("div");t.className="time";t.dataset.slot=s.k;t.style.background=`var(${s.sky})`;
+      t.innerHTML=`<span class="st">${s.s}</span><span class="en">– ${s.e}</span>`;
+      b.appendChild(t);
+      for(let m=0;m<3;m++){
+        const c=document.createElement("div");c.className="cell";c.dataset.m=m;c.dataset.k=s.k;c.style.setProperty("--mc",`var(${MC[m]})`);
+        c.innerHTML=`<span class="bar"></span><textarea data-m="${m}" data-k="${s.k}" placeholder="予定を入力" aria-label="${s.s}〜${s.e} メンバー${m+1}の予定"></textarea><button class="doneBtn" data-m="${m}" data-k="${s.k}" type="button">完了</button>`;
+        b.appendChild(c);
+      }
+    }
+  }
+
+  const busyKey=key=>dirty.has(key)||queue.has(curDate+"|"+key);
+  function paintCells(){
+    document.querySelectorAll(".cell").forEach(c=>{
+      const key=c.dataset.m+"_"+c.dataset.k,v=cells[key]||{},ta=c.querySelector("textarea");
+      if(document.activeElement!==ta&&!busyKey(key))ta.value=v.t||"";
+      c.classList.toggle("filled",!!ta.value.trim());
+      c.classList.toggle("done",!!v.d&&!!ta.value.trim());
+      c.querySelector(".doneBtn").textContent=v.d?"完了 ✓":"完了";
+    });
+    for(let m=0;m<3;m++){
+      let dn="";for(const s of SLOTS){if(s.lunch)continue;const v=cells[m+"_"+s.k];if(v&&v.n){dn=v.n;break}}
+      const cn=(names[m]||"").trim();
+      document.querySelector(`[data-was="${m}"]`).textContent=dn.trim()&&dn.trim()!==cn?`この日の記録名：${dn}`:"";
+    }
+  }
+  function paintNames(){
+    document.querySelectorAll("[data-name]").forEach(i=>{if(document.activeElement!==i&&!namesDirty)i.value=names[+i.dataset.name]||""});
+    paintCells();
+  }
+  function paintDate(){
+    const d=parse(curDate),t=todayStr(),diff=Math.round((d-parse(t))/86400000);
+    const rel=diff===0?"今日":diff===-1?"昨日":diff===1?"明日":diff<0?`${-diff}日前`:`${diff}日後`;
+    $("dateLabel").innerHTML=`${d.getMonth()+1}月${d.getDate()}日（${WD[d.getDay()]}）<small>${d.getFullYear()}年・${rel}</small>`;
+    $("picker").value=curDate;paintNow();paintHist();
+  }
+  function paintNow(){
+    const now=new Date(),isToday=curDate===todayStr(),h=now.getHours()+now.getMinutes()/60;
+    document.querySelectorAll(".time").forEach(t=>{
+      const s=SLOTS.find(x=>x.k===t.dataset.slot),on=isToday&&h>=s.from&&h<s.to;
+      t.classList.toggle("now",on);
+      let tag=t.querySelector(".nowTag");
+      if(on&&!tag){tag=document.createElement("span");tag.className="nowTag";tag.textContent="いまここ";t.appendChild(tag)}
+      if(!on&&tag)tag.remove();
+      document.querySelectorAll(`.cell[data-k="${s.k}"]`).forEach(c=>c.classList.toggle("nowRow",on));
+    });
+  }
+  function paintHist(){
+    const ul=$("histList");ul.innerHTML="";
+    $("histEmpty").style.display=histDates.length?"none":"block";
+    for(const s of histDates){
+      const d=parse(s),li=document.createElement("li"),b=document.createElement("button");
+      b.type="button";if(s===curDate)b.className="cur";
+      const a=document.createElement("span");a.textContent=`${d.getMonth()+1}/${d.getDate()}（${WD[d.getDay()]}）`;
+      const y=document.createElement("span");y.className="y";y.textContent=s===todayStr()?"今日":String(d.getFullYear());
+      b.append(a,y);b.onclick=()=>go(s);li.appendChild(b);ul.appendChild(li);
+    }
+  }
+
+  /* ---------- 通信 ---------- */
+  async function load(){
+    if(!configured)return;
+    const seq=++fetchSeq,date=curDate;
+    try{
+      const r=await fetch(GAS_URL+"?action=get&date="+encodeURIComponent(date),{cache:"no-store"});
+      const j=await r.json();
+      if(seq!==fetchSeq||date!==curDate)return;
+      if(!j.ok)throw new Error(j.error||"error");
+      if(!namesDirty&&!queue.has("names")&&Array.isArray(j.names))names=[0,1,2].map(i=>String(j.names[i]||""));
+      const next=j.cells||{};
+      for(const key of Object.keys({...cells,...next})){
+        if(busyKey(key))continue;
+        if(next[key])cells[key]=next[key];else delete cells[key];
+      }
+      histDates=Array.isArray(j.dates)?j.dates:[];
+      if(lastError.startsWith("読み込み"))lastError="";
+      paintNames();paintHist();refreshStatus();
+    }catch(e){
+      if(seq!==fetchSeq)return;
+      lastError="読み込みできませんでした。通信状況とURLを確認してください";refreshStatus();
+    }
+  }
+
+  function enqueue(qkey,payload){queue.set(qkey,payload);refreshStatus();pump()}
+  async function pump(){
+    if(sending||!queue.size||!configured)return;
+    sending=true;
+    const [qkey,payload]=queue.entries().next().value;
+    queue.delete(qkey);
+    try{
+      const r=await fetch(GAS_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});
+      const j=await r.json();
+      if(!j.ok)throw new Error(j.error||"error");
+      lastError="";
+      if(payload.action==="saveCell"&&payload.t.trim()&&!histDates.includes(payload.date)){histDates=[...histDates,payload.date].sort().reverse();paintHist()}
+    }catch(e){
+      if(!queue.has(qkey))queue.set(qkey,payload);   // 失敗した内容は再送する
+      lastError="保存できませんでした。5秒後に再試行します";
+      sending=false;refreshStatus();setTimeout(pump,5000);return;
+    }
+    sending=false;refreshStatus();pump();
+  }
+
+  function scheduleCell(m,k){
+    const key=m+"_"+k,date=curDate;dirty.add(key);refreshStatus();
+    clearTimeout(timers[key]);timers[key]=setTimeout(()=>commitCell(m,k,date),800);
+  }
+  function commitCell(m,k,date){
+    const key=m+"_"+k;clearTimeout(timers[key]);
+    if(!dirty.has(key))return;dirty.delete(key);
+    if(date!==curDate)return;
+    const v=cells[key]||{t:"",d:false};
+    enqueue(date+"|"+key,{action:"saveCell",date,m,k,t:v.t||"",d:!!v.d,name:names[m]||""});
+  }
+  function commitAll(){
+    for(const key of [...dirty]){const[m,k]=key.split("_");commitCell(+m,k,curDate)}
+    if(namesDirty){namesDirty=false;clearTimeout(timers.names);enqueue("names",{action:"saveNames",names:names.slice()})}
+  }
+  function scheduleNames(){
+    namesDirty=true;refreshStatus();clearTimeout(timers.names);
+    timers.names=setTimeout(()=>{namesDirty=false;enqueue("names",{action:"saveNames",names:names.slice()})},800);
+  }
+
+  /* ---------- 操作 ---------- */
+  document.addEventListener("input",e=>{
+    const t=e.target;
+    if(t.matches("textarea[data-m]")){
+      const m=+t.dataset.m,k=t.dataset.k,key=m+"_"+k,cur=cells[key]||{};
+      cells[key]={...cur,t:t.value,d:t.value.trim()?!!cur.d:false};
+      t.closest(".cell").classList.toggle("filled",!!t.value.trim());
+      scheduleCell(m,k);
+    }else if(t.matches("[data-name]")){names[+t.dataset.name]=t.value;scheduleNames()}
+  });
+  document.addEventListener("focusout",e=>{
+    const t=e.target;
+    if(t.matches("textarea[data-m]"))commitCell(+t.dataset.m,t.dataset.k,curDate);
+  });
+  document.addEventListener("click",e=>{
+    const b=e.target.closest(".doneBtn");if(!b)return;
+    const m=+b.dataset.m,k=b.dataset.k,key=m+"_"+k,cur=cells[key]||{};
+    cells[key]={...cur,d:!cur.d};dirty.add(key);paintCells();commitCell(m,k,curDate);
+  });
+
+  function go(s){
+    if(!s||s===curDate)return;
+    commitAll();
+    curDate=s;cells={};paintDate();paintCells();load();
+  }
+  $("prev").onclick=()=>{const d=parse(curDate);d.setDate(d.getDate()-1);go(ymd(d))};
+  $("next").onclick=()=>{const d=parse(curDate);d.setDate(d.getDate()+1);go(ymd(d))};
+  $("today").onclick=()=>go(todayStr());
+  $("reload").onclick=()=>{commitAll();load()};
+  $("picker").onchange=e=>go(e.target.value);
+  document.addEventListener("visibilitychange",()=>{if(document.hidden)commitAll();else load()});
+  window.addEventListener("beforeunload",e=>{commitAll();if(queue.size||sending){e.preventDefault();e.returnValue=""}});
+  setInterval(paintNow,60000);
+  setInterval(()=>{if(!document.hidden)load()},POLL_MS);
+
+  build();paintDate();paintNames();
+  if(!configured){
+    setStatus("err","スプレッドシート未接続");
+    banner("index.html の GAS_URL に、Apps ScriptのウェブアプリURLを貼り付けてください。未設定のままだと入力内容は保存されません。");
+  }else load();
+})();
+</script>
+</body>
+</html>
