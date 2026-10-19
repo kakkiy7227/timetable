@@ -133,7 +133,7 @@ h1{margin:0;font-size:22px;font-weight:700;letter-spacing:.02em}
 
 <script>
 // ▼ Apps Scriptをデプロイしたときに表示される「ウェブアプリのURL」を貼り付けてください
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbyg3HoapYRTdJXbuYK1upRuNZV8qoK1r4578tMiVZhMRW7GviZ6fcEx4UlhcepgawIcsA/exec';
+const GAS_URL = 'ここにウェブアプリのURLを貼り付け';
 
 (function(){
   const POLL_MS=15000;
@@ -164,6 +164,9 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbyg3HoapYRTdJXbuYK1upRu
   const timers={};
   const queue=new Map();     // 送信待ち（キー→最新の内容）
   let sending=false, lastError="", fetchSeq=0;
+  const inflight=new Set();  // 送信中（サーバーの応答待ち）
+  const touched={};          // 最後に自分が編集・保存した時刻
+  const touch=qk=>{touched[qk]=Date.now()};
 
   /* ---------- 表示 ---------- */
   function setStatus(kind,text){const el=$("status");el.className="status "+kind;el.querySelector("span").textContent=text}
@@ -201,7 +204,7 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbyg3HoapYRTdJXbuYK1upRu
     }
   }
 
-  const busyKey=key=>dirty.has(key)||queue.has(curDate+"|"+key);
+  const busyKey=key=>{const qk=curDate+"|"+key;return dirty.has(key)||queue.has(qk)||inflight.has(qk)};
   function paintCells(){
     const offs=[0,1,2].map(m=>!!(cells[m+"_off"]&&cells[m+"_off"].t));
     document.querySelectorAll("[data-off]").forEach(cb=>{
@@ -251,16 +254,17 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbyg3HoapYRTdJXbuYK1upRu
   /* ---------- 通信 ---------- */
   async function load(){
     if(!configured)return;
-    const seq=++fetchSeq,date=curDate;
+    const seq=++fetchSeq,date=curDate,startedAt=Date.now();
     try{
       const r=await fetch(GAS_URL+"?action=get&date="+encodeURIComponent(date),{cache:"no-store"});
       const j=await r.json();
       if(seq!==fetchSeq||date!==curDate)return;
       if(!j.ok)throw new Error(j.error||"error");
-      if(!namesDirty&&!queue.has("names")&&Array.isArray(j.names))names=[0,1,2].map(i=>String(j.names[i]||""));
+      if(!namesDirty&&!queue.has("names")&&!inflight.has("names")&&(touched.names||0)<startedAt-1000&&Array.isArray(j.names))names=[0,1,2].map(i=>String(j.names[i]||""));
       const next=j.cells||{};
       for(const key of Object.keys({...cells,...next})){
         if(busyKey(key))continue;
+        if((touched[date+"|"+key]||0)>=startedAt-1000)continue;  // 読み込み開始後に自分が変更した欄は上書きしない
         if(next[key])cells[key]=next[key];else delete cells[key];
       }
       if(lastError.startsWith("読み込み"))lastError="";
@@ -276,22 +280,23 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbyg3HoapYRTdJXbuYK1upRu
     if(sending||!queue.size||!configured)return;
     sending=true;
     const [qkey,payload]=queue.entries().next().value;
-    queue.delete(qkey);
+    queue.delete(qkey);inflight.add(qkey);
     try{
       const r=await fetch(GAS_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});
       const j=await r.json();
       if(!j.ok)throw new Error(j.error||"error");
-      lastError="";
+      lastError="";touch(qkey);
     }catch(e){
       if(!queue.has(qkey))queue.set(qkey,payload);   // 失敗した内容は再送する
+      inflight.delete(qkey);
       lastError="保存できませんでした。5秒後に再試行します";
       sending=false;refreshStatus();setTimeout(pump,5000);return;
     }
-    sending=false;refreshStatus();pump();
+    inflight.delete(qkey);sending=false;refreshStatus();pump();
   }
 
   function scheduleCell(m,k){
-    const key=m+"_"+k,date=curDate;dirty.add(key);refreshStatus();
+    const key=m+"_"+k,date=curDate;dirty.add(key);touch(date+"|"+key);refreshStatus();
     clearTimeout(timers[key]);timers[key]=setTimeout(()=>commitCell(m,k,date),800);
   }
   function commitCell(m,k,date){
@@ -306,7 +311,7 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbyg3HoapYRTdJXbuYK1upRu
     if(namesDirty){namesDirty=false;clearTimeout(timers.names);enqueue("names",{action:"saveNames",names:names.slice()})}
   }
   function scheduleNames(){
-    namesDirty=true;refreshStatus();clearTimeout(timers.names);
+    namesDirty=true;touch("names");refreshStatus();clearTimeout(timers.names);
     timers.names=setTimeout(()=>{namesDirty=false;enqueue("names",{action:"saveNames",names:names.slice()})},800);
   }
 
@@ -324,12 +329,12 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbyg3HoapYRTdJXbuYK1upRu
     const t=e.target;
     if(t.matches("[data-off]")){
       const m=+t.dataset.off,key=m+"_off";
-      cells[key]={t:t.checked?"有休":"",d:false};dirty.add(key);
+      cells[key]={t:t.checked?"有休":"",d:false};dirty.add(key);touch(curDate+"|"+key);
       paintCells();commitCell(m,"off",curDate);return;
     }
     if(!t.matches("[data-in]"))return;
     const m=+t.dataset.in,key=m+"_in";
-    cells[key]={t:t.value,d:false};dirty.add(key);
+    cells[key]={t:t.value,d:false};dirty.add(key);touch(curDate+"|"+key);
     t.classList.toggle("set",!!t.value);
     commitCell(m,"in",curDate);
   });
