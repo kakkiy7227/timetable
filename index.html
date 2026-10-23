@@ -49,7 +49,30 @@ h1{margin:0;font-size:22px;font-weight:700;letter-spacing:.02em}
 .datebar button:hover{background:var(--soft)}
 .dateLabel{font-size:20px;font-weight:700;min-width:9.5em;text-align:center;font-feature-settings:"tnum"}
 .dateLabel small{display:block;font-size:12px;font-weight:500;color:var(--muted);line-height:1.2}
-.datebar input[type=date]{height:38px;border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:0 8px}
+.datebar button.calBtn{font-size:17px;padding:0 10px}
+.datebar button.calBtn[aria-expanded="true"]{background:var(--soft);border-color:var(--focus)}
+.cal{position:fixed;z-index:20;width:312px;max-width:calc(100vw - 16px);background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 32px rgba(0,0,0,.18);padding:12px}
+.cal[hidden]{display:none}
+.cal .calHead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.cal .calHead strong{font-size:16px;font-feature-settings:"tnum"}
+.cal .calHead button{border:1px solid var(--line);background:var(--surface);border-radius:8px;height:32px;min-width:32px;padding:0 10px;cursor:pointer;font-size:13px}
+.cal .calHead button:hover{background:var(--soft)}
+.cal .calNav{display:flex;gap:6px}
+.cal .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.cal .wd{text-align:center;font-size:11px;color:var(--muted);padding:2px 0 4px}
+.cal .wd.sun,.cal .day.sun .n{color:#D04848}
+.cal .wd.sat,.cal .day.sat .n{color:#3A72C9}
+.cal .day{border:0;background:transparent;border-radius:8px;height:44px;padding:4px 0 0;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px}
+.cal .day:hover{background:var(--soft)}
+.cal .day .n{font-family:var(--num);font-size:14px;line-height:1.2;font-feature-settings:"tnum"}
+.cal .day.out{visibility:hidden}
+.cal .day.today .n{font-weight:700;text-decoration:underline;text-underline-offset:3px}
+.cal .day.cur{background:color-mix(in srgb,var(--focus) 16%,transparent);box-shadow:inset 0 0 0 1.5px var(--focus)}
+.cal .dots{display:flex;gap:3px;height:6px}
+.cal .dots i{width:6px;height:6px;border-radius:50%}
+.cal .legend{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:10px;padding-top:8px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+.cal .legend span{display:inline-flex;align-items:center;gap:5px}
+.cal .legend i{width:8px;height:8px;border-radius:50%;display:inline-block}
 
 .status{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px}
 .status i{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block}
@@ -118,12 +141,13 @@ h1{margin:0;font-size:22px;font-weight:700;letter-spacing:.02em}
       <button id="next" aria-label="次の日">▶</button>
       <button id="today">今日</button>
       <button id="reload" aria-label="最新の状態に更新" title="最新の状態に更新">⟳</button>
-      <input type="date" id="picker" aria-label="日付を選ぶ">
+      <button type="button" id="calBtn" class="calBtn" aria-label="カレンダーから日付を選ぶ" aria-expanded="false" aria-haspopup="dialog">📅</button>
     </div>
     <div class="status" id="status" role="status"><i></i><span>読み込み中…</span></div>
   </header>
 
   <div class="banner" id="banner"></div>
+  <div class="cal" id="cal" role="dialog" aria-label="カレンダー" hidden></div>
 
   <div>
       <div class="boardScroll"><div class="board" id="board"></div></div>
@@ -237,7 +261,7 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbyg3HoapYRTdJXbuYK1upRu
     const d=parse(curDate),t=todayStr(),diff=Math.round((d-parse(t))/86400000);
     const rel=diff===0?"今日":diff===-1?"昨日":diff===1?"明日":diff<0?`${-diff}日前`:`${diff}日後`;
     $("dateLabel").innerHTML=`${d.getMonth()+1}月${d.getDate()}日（${WD[d.getDay()]}）<small>${d.getFullYear()}年・${rel}</small>`;
-    $("picker").value=curDate;paintNow();
+    paintNow();paintCal();
   }
   function paintNow(){
     const now=new Date(),isToday=curDate===todayStr(),h=now.getHours()+now.getMinutes()/60;
@@ -267,6 +291,8 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbyg3HoapYRTdJXbuYK1upRu
         if((touched[date+"|"+key]||0)>=startedAt-1000)continue;  // 読み込み開始後に自分が変更した欄は上書きしない
         if(next[key])cells[key]=next[key];else delete cells[key];
       }
+      if(j.marks&&typeof j.marks==="object"){marks=j.marks;for(let m=0;m<3;m++){const qk=date+"|"+m+"_";if([...dirty].some(k=>k.startsWith(m+"_"))||[...queue.keys(),...inflight].some(k=>k.startsWith(qk)))updateMark(date,m)}}
+      paintCal();
       if(lastError.startsWith("読み込み"))lastError="";
       paintNames();refreshStatus();
     }catch(e){
@@ -286,6 +312,7 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbyg3HoapYRTdJXbuYK1upRu
       const j=await r.json();
       if(!j.ok)throw new Error(j.error||"error");
       lastError="";touch(qkey);
+      if(payload.action==="saveCell")updateMark(payload.date,payload.m);
     }catch(e){
       if(!queue.has(qkey))queue.set(qkey,payload);   // 失敗した内容は再送する
       inflight.delete(qkey);
@@ -313,6 +340,66 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbyg3HoapYRTdJXbuYK1upRu
   function scheduleNames(){
     namesDirty=true;touch("names");refreshStatus();clearTimeout(timers.names);
     timers.names=setTimeout(()=>{namesDirty=false;enqueue("names",{action:"saveNames",names:names.slice()})},800);
+  }
+
+
+  /* ---------- 月カレンダー ---------- */
+  let marks={};              // "YYYY-MM-DD" → [0/1,0/1,0/1]
+  let calMonth=null;         // 表示中の月（1日）
+  const calEl=$("cal"),calBtn=$("calBtn");
+  function openCal(){
+    const d=parse(curDate);calMonth=new Date(d.getFullYear(),d.getMonth(),1);
+    calEl.hidden=false;calBtn.setAttribute("aria-expanded","true");
+    paintCal();placeCal();
+  }
+  function closeCal(){if(calEl.hidden)return;calEl.hidden=true;calBtn.setAttribute("aria-expanded","false")}
+  function placeCal(){
+    if(calEl.hidden)return;
+    const r=calBtn.getBoundingClientRect(),w=calEl.offsetWidth;
+    calEl.style.top=Math.min(r.bottom+6,window.innerHeight-calEl.offsetHeight-8)+"px";
+    calEl.style.left=Math.max(8,Math.min(r.right-w,window.innerWidth-w-8))+"px";
+  }
+  function paintCal(){
+    if(calEl.hidden||!calMonth)return;
+    const y=calMonth.getFullYear(),mo=calMonth.getMonth(),t=todayStr();
+    let h=`<div class="calHead"><strong>${y}年${mo+1}月</strong><div class="calNav"><button type="button" data-cal="-1" aria-label="前の月">‹</button><button type="button" data-cal="0">今月</button><button type="button" data-cal="1" aria-label="次の月">›</button></div></div><div class="grid">`;
+    WD.forEach((w,i)=>{h+=`<div class="wd${i===0?" sun":i===6?" sat":""}">${w}</div>`});
+    const first=new Date(y,mo,1).getDay(),days=new Date(y,mo+1,0).getDate();
+    for(let i=0;i<first;i++)h+=`<span class="day out"></span>`;
+    for(let dd=1;dd<=days;dd++){
+      const s=y+"-"+pad(mo+1)+"-"+pad(dd),wd=new Date(y,mo,dd).getDay(),mk=marks[s]||[];
+      let dots="",who=[];
+      for(let m=0;m<3;m++)if(mk[m]){dots+=`<i style="background:var(${MC[m]})"></i>`;who.push(names[m]||`メンバー${m+1}`)}
+      const cls="day"+(wd===0?" sun":wd===6?" sat":"")+(s===t?" today":"")+(s===curDate?" cur":"");
+      const label=`${mo+1}月${dd}日`+(who.length?`（入力あり：${who.join("、")}）`:"");
+      h+=`<button type="button" class="${cls}" data-date="${s}" aria-label="${label}" title="${label}"><span class="n">${dd}</span><span class="dots">${dots}</span></button>`;
+    }
+    h+=`</div><div class="legend">`;
+    for(let m=0;m<3;m++)h+=`<span><i style="background:var(${MC[m]})"></i>${esc(names[m]||`メンバー${m+1}`)}</span>`;
+    h+=`</div>`;
+    calEl.innerHTML=h;
+  }
+  const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  calBtn.onclick=e=>{e.stopPropagation();calEl.hidden?openCal():closeCal()};
+  calEl.addEventListener("click",e=>{
+    e.stopPropagation();
+    const nav=e.target.closest("[data-cal]");
+    if(nav){const v=+nav.dataset.cal;if(v===0){const n=new Date();calMonth=new Date(n.getFullYear(),n.getMonth(),1)}else calMonth=new Date(calMonth.getFullYear(),calMonth.getMonth()+v,1);paintCal();placeCal();return}
+    const d=e.target.closest("[data-date]");
+    if(d){closeCal();go(d.dataset.date)}
+  });
+  document.addEventListener("click",closeCal);
+  document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCal()});
+  window.addEventListener("resize",placeCal);
+  window.addEventListener("scroll",placeCal,{passive:true});
+  // 自分の保存結果を、次の読み込みを待たずに点へ反映する
+  function updateMark(date,m){
+    if(date!==curDate)return;
+    let has=false;
+    for(const key in cells){if(key.startsWith(m+"_")&&cells[key]&&String(cells[key].t||"").trim()){has=true;break}}
+    const mk=(marks[date]||[0,0,0]).slice();mk[m]=has?1:0;
+    if(mk.some(Boolean))marks[date]=mk;else delete marks[date];
+    paintCal();
   }
 
   /* ---------- 操作 ---------- */
@@ -352,7 +439,6 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbyg3HoapYRTdJXbuYK1upRu
   $("next").onclick=()=>{const d=parse(curDate);d.setDate(d.getDate()+1);go(ymd(d))};
   $("today").onclick=()=>go(todayStr());
   $("reload").onclick=()=>{commitAll();load()};
-  $("picker").onchange=e=>go(e.target.value);
   document.addEventListener("visibilitychange",()=>{if(document.hidden)commitAll();else load()});
   window.addEventListener("beforeunload",e=>{commitAll();if(queue.size||sending){e.preventDefault();e.returnValue=""}});
   setInterval(paintNow,60000);
